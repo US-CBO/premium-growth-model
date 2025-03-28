@@ -1,0 +1,9 @@
+*.db
+*.dta
+*.log
+.Rdata
+.Rhistory
+.Rproj.user/
+.Ruserdata
+*.tmp
+*.xlsx

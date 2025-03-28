@@ -1,0 +1,5 @@
+# This file exists so that we can add an empty directory in the repository
+# Ignore everything in this directory
+*
+# Except this file
+!.gitignore

@@ -1,0 +1,813 @@
+---
+title: ""
+execute:
+    echo: False
+format: 
+  html:
+    self-contained: true
+    toc: true
+    theme: superhero
+    title-block-banner: "194c66"
+    author: "Julianna Mack & Ben Hopkins" 
+    date: 3/17/2025
+    date-format: short
+editor: 
+  markdown: 
+    wrap: 72
+---
+
+::: header
+<img src="../../images/cbo_logo_white_desktop.svg"/>
+:::
+
+# Premium Growth Model Annual Report: 2025
+
+##### Last Updated: `r format(Sys.Date(), "%A %b %d, %Y")`
+
+##### Author: Julianna Mack & Ben Hopkins
+
+```{r import_packages, warning=FALSE, message=FALSE, results='hide'}
+library(dplyr)
+library(readr)
+library(stringr)
+library(tidyr)
+library(ggplot2)
+library(patchwork)
+
+# Parameters
+baseline_vintage <- 2025
+baseline_vintage_prev <- baseline_vintage - 1
+projection_start <- as.numeric("2024")  # Start year for current baseline
+projection_start_prev <- as.numeric("2024")  # Start year for previous baseline
+projection_end <- as.numeric("2035")  # End year for current baseline
+projection_end_prev <- as.numeric("2034")  # End year for previous 
+
+# Define the head directory of the repository, which is three levels above the directory where this program is saved
+dir_repo <- normalizePath(file.path(getwd(), "../../.."))
+
+# Define output and nongroup baseline directories
+dir_output <- paste0(dir_repo, "/output/baseline_", baseline_vintage, "/")
+dir_nongroup_baseline <- paste0(dir_repo, "/prepped_data/nongroup_baseline/", baseline_vintage_prev, "/")
+
+#  Define input files
+file_pgm_output <- paste0("pgm_", baseline_vintage, ".csv")
+file_previous_ng_baseline <- paste0(baseline_vintage_prev, "_baseline_nongroup.csv")
+
+#  Load final output file from PGM
+pgm_output <- read_csv(paste0(dir_output, file_pgm_output)) 
+
+# Define series names dynamically
+prem_demo_prev <- paste0("prem_demo_b", baseline_vintage_prev)
+prem_demo <- paste0("prem_demo_b", baseline_vintage)
+pchange_prem_demo_prev <- paste0("pchange_", prem_demo_prev)
+pchange_prem_demo <- paste0("pchange_", prem_demo)
+prem_prev <- paste0("prem_b", baseline_vintage_prev)
+prem <- paste0("prem_b", baseline_vintage)
+pchange_prem_prev <- paste0("pchange_", prem_prev)
+pchange_prem <- paste0("pchange_", prem)
+level_prev <- prem_demo_prev
+level_step1 <- paste0(prem_demo_prev, "_step1")
+level_step2 <- paste0(prem_demo_prev, "_step2")
+level_step3 <- paste0(prem_demo_prev, "_step3")
+level_step4 <- paste0(prem_demo_prev, "_step4")
+level_current <- prem_demo
+level_jct_prev <- prem_prev
+level_jct_current <- prem
+pchange_prev <- pchange_prem_demo_prev
+pchange_step1 <- paste0(pchange_prem_demo_prev, "_step1")
+pchange_step2 <- paste0(pchange_prem_demo_prev, "_step2")
+pchange_step3 <- paste0(pchange_prem_demo_prev, "_step3")
+pchange_step4 <- paste0(pchange_prem_demo_prev, "_step4")
+pchange_current <- pchange_prem_demo
+pchange_jct_prev <- pchange_prem_prev
+pchange_jct_current <- pchange_prem
+
+# Format the data for plotting
+df_long <- pgm_output %>%
+    pivot_longer(
+    cols = starts_with("cy"),            # Columns with years (cy1987, cy1988, ...)
+    names_to = "year",                   # Name for the new 'year' column
+    values_to = "value"                  # Name for the new 'value' column
+  ) %>%
+  mutate(year = as.numeric(sub("cy", "", year)), .before = "value") %>%
+  select(-first_historical_year, -specification)
+
+# Define the color, shape, and label values with dynamic names
+series_vector <- c(
+    level_prev, 
+    level_step1,
+    level_step2,
+    level_step3,
+    level_step4,
+    level_current,
+    level_jct_prev, 
+    level_jct_current,
+    pchange_prev, 
+    pchange_step1,
+    pchange_step2,
+    pchange_step3,
+    pchange_step4,
+    pchange_current,
+    pchange_jct_prev, 
+    pchange_jct_current
+  )
+  
+color_values <- setNames(
+  rep(
+      c(
+        "#EE1818", 
+        "#A23616",
+        "#565514",
+        "#0A7413",
+        "#2B607E",
+        "#4C4CE9",
+        "#EE1818", 
+        "#4C4CE9"
+      ), 
+    2)
+  ,
+  series_vector
+)
+
+shape_values <- setNames(
+  rep(
+      c(
+        16, # Filled circle
+        17, # Filled triangle
+        18, # Filled diamond
+        4,  # X
+        15, # Square
+        3,  # +
+        16, # Filled circle
+        15 # Square
+      ),
+    2),
+  series_vector
+)
+
+label_values <- setNames(
+  rep(
+      c(
+        paste0(baseline_vintage_prev, " baseline"), 
+        "Updated Historicals",
+        "Updated Macroeconomic Forecast",
+        "Updated Coefficients",
+        "Updated Specification",
+        paste0(baseline_vintage, " baseline"),
+        paste0(baseline_vintage_prev, " baseline"), 
+        paste0(baseline_vintage, " baseline")
+      ),
+    2),
+  series_vector
+)
+
+forecast_plots <- function(level_series, pchange_series, combined_title) {
+  # Declare function to create the main plots comparing premium projections
+  #' Generate Projection Plots
+  #'
+  #' Creates combined level and percent change projection plots based on provided series data.
+  #'
+  #' @param level_series A character vector specifying the series to be plotted as levels.
+  #' @param pchange_series A character vector specifying the series to be plotted as percent changes.
+  #' @param combined_title A string representing the title for the combined plot.
+  #'
+  #' @return A combined ggplot object displaying both level and percent change projections.
+
+  subplot <- function(subplot_series, is_levels = TRUE) { 
+    #' Generate a Subplot for Specified Data Series
+    #'
+    #' This function creates a ggplot-based subplot for the given data series. It differentiates between historical and projection data by styling historical data as solid lines and projection data as dashed lines. The y-axis can be formatted to display either levels in dollars or percent changes based on the `is_levels` parameter.
+    #'
+    #' @param subplot_series A character vector specifying the series to include in the subplot.
+    #' @param is_levels A logical value indicating whether to format the y-axis as levels (`TRUE`) or percent changes (`FALSE`). Defaults to `TRUE`.
+    #'
+    #' @return A ggplot object representing the generated subplot.
+
+    # Duplicate the dataset, with the series truncated at the last historical year in one copy
+    # This allows us to plot the historical data as a solid line and the projection data as a dashed line
+    plot_data_full <- df_long %>%
+      filter(
+        year >= 1998,
+        series %in% subplot_series 
+      ) |>
+      mutate(actual = "Projection")
+    plot_data_actual <- plot_data_full %>%
+      filter(year <= last_historical_year) |>
+      mutate(actual = "Historical")
+    plot_data <- bind_rows(
+      plot_data_actual,
+      plot_data_full
+    )
+
+    # Define the plot
+    return_plot <- plot_data |>
+      ggplot(aes(x = year, y = value, color = series, shape = series, linetype = actual)) +
+      geom_hline(yintercept = 0, color = "grey") +
+      geom_vline(xintercept = projection_start, color = "grey", linetype = "dashed") + 
+      geom_line(size = 1.2) +
+      geom_point(size = 2.5) +
+      scale_linetype_manual(values = c("Projection" = "dashed", "Historical" = "solid")) + 
+      scale_color_manual(
+        values = color_values,
+        labels = label_values
+      ) + 
+      scale_shape_manual(
+        values = shape_values,
+        labels = label_values
+      ) + 
+      labs(
+        x = NULL,
+        color = NULL,
+        shape = NULL
+      ) +
+      guides(linetype = "none")
+
+      # Format the y-axis based on whether the series are levels or percent changes
+      if (is_levels) {
+        return_plot <- return_plot + 
+          # Format the y-axis labels as dollars and start the y-axis at 0
+          scale_y_continuous(labels = scales::dollar, limits = c(0, NA)) +
+          labs(y = "Dollars")
+      }
+      else {
+        return_plot <- return_plot + 
+          # Format the y-axis labels as percentages and start the y-axis at 0
+          scale_y_continuous(labels = scales::percent, limits = c(0, NA)) +
+          labs(y = "Percent Change")
+      }
+    return(return_plot)
+  }
+
+  # Generate the plots for the level and percent change series
+  level_plot <- subplot(level_series, is_levels = TRUE)
+  growth_plot <- subplot(pchange_series, is_levels = FALSE)
+
+  # Generate and return the combined plot
+  combined_plot <- (level_plot | growth_plot) +
+    plot_layout(guides = "collect") &
+    plot_annotation(
+      title = combined_title
+    ) &
+    theme(
+        plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
+        legend.position = "top",
+        legend.title = element_blank(),
+        # Set the background of the markers in the legend to be transparent
+        legend.key = element_rect(fill = "transparent")
+    )
+  return(combined_plot)
+}
+```
+
+```{r calc_increase, warning=FALSE, message=FALSE, results='hide'}
+# Calculate the increase in private health expenditures per capita in 2034 
+# between prem_demo_b2024 and prem_demo_b2025
+increase <- pgm_output |>
+    select(series, cy2034) |>
+    filter(series %in% c("prem_demo_b2024", "prem_demo_b2025")) |>
+    spread(series, cy2034) |>
+    mutate(
+        pct_increase = (prem_demo_b2025 - prem_demo_b2024) / prem_demo_b2024,
+        dollar_increase = prem_demo_b2025 - prem_demo_b2024
+      )
+
+pct_increase <- increase |>
+    pull(pct_increase) |>
+    # Format as a percentage
+    scales::percent(accuracy = 0.1)
+
+dollar_increase <- scales::label_dollar(accuracy=1)(increase |> pull(dollar_increase))
+```
+
+## Introduction
+
+The Congressional Budget Office uses the premium growth model (PGM) to
+project health expenditures per privately insured person through the
+10-year baseline period. The PGM generates factors used in CBO's
+health insurance simulation model, HISIM2, to project increases in health spending, employment-based insurance
+(EBI) premiums, and employer contributions to health
+reimbursement accounts (HRAs) and health savings accounts (HSAs). The
+factors are also used to project growth in plan characteristics such as maximum
+out-of-pocket spending for EBI plans and for nongroup plans, and deductibles
+for nongroup plans. Additionally, the output of the PGM is used in HISIM2 to project growth in premiums for nongroup plans. The PGM's output is also used by the Joint Committee on
+Taxation and is used for other purposes by CBO.
+
+The PGM is updated by CBO each year, and those updates are incorporated
+into CBO's spring baselines. The most recent PGM projections are for the
+spring 2025 baseline, and the previous projections were for the spring
+2024 baseline. One way to compare the two sets of projections is to
+focus on the projected expenditures for health care services per capita
+by insurers in the last year they share in common (2034). Looking at the
+figure below, the 2025 updates to the PGM have increased projected
+expenditures per capita in 2034 by about `r dollar_increase`
+(`r pct_increase`). CBO now projects higher per capita expenditures than
+it did last year after incorporating newly available historical data
+indicating rapid premium growth in 2022 and 2023 and consulting with
+stakeholders, who suggested that high growth rates are likely to persist
+through at least 2025. The surge in expenditures among the privately
+insured partly reflects the adoption of costly pharmaceuticals, most
+notably GLP-1s, but it also reflects broader growth in spending on
+hospital care and mental health care. CBO has also significantly updated
+the specification of the regression model. Those technical updates
+have smoothed the path of projected premium growth but did not
+significantly alter the projected level of expenditures at the end of
+the period.
+
+```{r compare_forecast, warning=FALSE, message=FALSE, results='hide'}
+
+level_series_compare <- c(level_prev, level_current)
+pchange_series_compare <- c(pchange_prev, pchange_current)
+combined_plot_compare <- forecast_plots(level_series_compare, pchange_series_compare, "Previous and Current Projections")
+combined_plot_compare
+```
+
+## Overview of the Premium Growth Model (PGM) and Updates for the 2025 Baseline
+
+The PGM is a set of two time-series regression models used to project
+growth in health expenditures per privately insured person; those
+projections serve as the basis for premiums in CBO's modeling. Health
+expenditures, in this context, include amounts paid by the health
+insurer and administrative expenses incurred by the insurer and exclude
+cost sharing paid by the patient at the point of service and
+out-of-pocket spending on noncovered services. Private health insurance
+includes EBI plans and nongroup plans and excludes
+medigap plans, Medicare Advantage plans, and Medicaid managed care plans. The
+first of the two models, the current-year model, projects expenditures
+for the first year of the forecast window using recent data on premiums
+from surveys. The second, the primary model, projects expenditures for
+the remainder of the forecast window using an autoregressive term and
+CBO's macroeconomic forecast. The 2025 PGM uses growth in real income to
+project real health expenditures per privately insured person. The
+projected real health expenditures are then combined with projected
+prices (PCEMED) to produce nominal projected expenditures per capita.
+
+### Data
+
+The key source for historical estimates of expenditures per capita is
+the National Health Expenditure Accounts (NHEA).[^1] CBO modifies those
+data in two ways. First, estimated medigap plan expenditures and
+medigap enrollment are removed. Second, expenditures are adjusted to
+remove the effects of onetime events that significantly affected
+expenditure growth but should not be reflected in the long-term
+equilibrium--namely the establishment of health insurance marketplaces
+under the Affordable Care Act[^2] and the COVID-19 pandemic.
+
+[^1]: For definitions of terms used in this report, please refer to the Glossary at the end of this report.
+
+[^2]: The growth rate is increased by half a percentage point in 2013
+    and decreased by half a percentage point in 2014 to account for
+    the effects of the Affordable Care Act.
+
+The ACA marketplaces significantly altered the individual insurance
+market by expanding coverage and introducing new subsidies, but their
+impact on expenditure growth rates varied over time. In the initial
+years, there was a surge in enrollment, particularly among previously
+uninsured individuals with preexisting health care needs, leading to a
+temporary spike in expenditures. Over time, as the market stabilized and
+risk pools adjusted, expenditure growth rates may have normalized, which
+is why CBO views the establishment of those marketplaces more as a
+onetime shock than a permanent change in trend.
+
+CBO creates two versions of the historical and projected expenditures.
+One version includes an adjustment to exclude any growth due to changes
+in the age and sex composition of the privately insured population, and
+the other version does not include that adjustment. HISIM2 uses premium
+growth projections that exclude the effects of demographic changes
+because the microsimulation model implicitly accounts for those changes
+while projecting insurance coverage.[^3] To create the age- and
+sex-adjusted version, CBO uses the Current Population Survey (CPS) to
+estimate, for each historical year, the share of the privately insured
+population with each combination of single year of age and sex. CBO then
+applies the spending patterns estimated by
+Dale H. Yamamoto (2013) to estimate the change in expenditures attributable to demographic
+changes and creates an annual index used to scale estimates of health
+expenditures per privately insured person.[^4]
+
+[^3]: For the Joint Committee on Taxation, CBO produces a version of the
+    projections that does not account for demographic changes. For that
+    purpose, the series includes all other modifications discussed in
+    this report and is projected using the same model specification.
+
+[^4]: Dale H. Yamamoto. [*Health Care Costs---From Birth to Death*](https://www.soa.org/resources/research-reports/2013/research-health-care-birth-death/) (2013).
+
+Other inputs to the model include [CBO's historical data and economic projections](https://www.cbo.gov/data/budget-economic-data#11).
+Those variables include the total U.S. population (including members of the
+armed forces overseas and the institutionalized population), personal
+disposable income (PDI), the personal consumption expenditures price
+index for consumer goods (PCE). For the PGM, CBO also uses historical and projected values of the
+personal consumption expenditures price index for medical spending
+(PCEMED).
+
+CBO adjusts both the expenditure and income variables during the
+pandemic period because the pandemic resulted in higher PDI and a
+temporary decrease in utilization of health care services. That decrease
+in utilization resulted in low expenditure growth in 2020 and high
+expenditure growth in 2021 as utilization rebounded. Without adjustment,
+those outliers may result in less accurate coefficient estimates and
+affect the projections through the autoregressive terms in the model.
+CBO adjusts income because stimulus payments in 2021 and 2022 provided a
+temporary boost to income that was slowly spent down over subsequent
+years. Less significantly, many people realized large capital gains in
+2021 because of excess liquidity from the 2020 stimulus checks and
+other pandemic-related fiscal measures. CBO smoothed those fluctuations
+in income under the assumption that health spending responds more to
+permanent changes in income than temporary ones over the medium run.
+
+For the spring 2025 baseline, CBO made the following changes to its
+treatment of the data:
+
+| Factor | Spring 2024 | Spring 2025 |
+|----|----|----|
+| COVID Adjustment: Expenditures | Fixed expenditure growth to 2.4% (2020) and 2.5% (2021) to align with survey estimates of premium growth. | Fixed 2020 expenditures at the midpoint of 2019 and 2021 expenditures. |
+| COVID Adjustment: PDI | None | Smoothed PDI to account for the slow draw down of stimulus income in 2021 and 2022 and surplus capital gains in 2021. |
+| medigap backcasting[^5] | Backcast medigap spending to 1987 using Consumer Price Index for All Urban Consumers: Medical Care | Backcast medigap spending to 1987 using Medicare expenditure per capita |
+
+[^5]: The NHEA estimates of medigap spending per enrollee begin in 2001.
+
+### Methods
+
+The PGM consists of two models: the current-year model and the primary
+model. The current year model is used to project real health
+expenditures per capita in the first year of the forecast window. The
+primary model is used to project health expenditures for the remaining
+years of the window. As the primary model is an autoregressive model,
+the projection of the current-year model is an input to the projection
+of the primary model.
+
+The current-year regression model calculates a preliminary estimate of
+growth in private health expenditures per capita from 2023 to 2024. That
+model is estimated using historical data through 2023 on growth in
+premiums for EBI plans and then used to project growth in
+expenditures in 2024. This model is necessary because the last year of
+historical data from the NHEA is 2023, but other sources provide useful
+information on growth in private premiums from 2023 to 2024 and from 2024 to
+2025. The sources for this regression model are the Bureau of Labor
+Statistics' (BLS's)
+producer price index (PPI) for comprehensive medical insurance plans, and
+KFF's Employer Health Benefits
+Survey (EHBS).[^6]
+
+[^6]: See Bureau of Labor Statistics, [*PPI industry data for Direct health and medical insurance
+    carriers-Comprehensive medical service plans, not seasonally
+    adjusted*](https://data.bls.gov/timeseries/PCU524114524114101) (accessed January, 2025). For more
+    information on the EHBS, see Gary Claxton, Matthew Rae, Aubrey Winger,
+    and Emma Wager, [*Employer Health Benefits: 2024 Annual Survey*](https://files.kff.org/attachment/Employer-Health-Benefits-Survey-2024-Annual-Survey.pdf) (October 2024).
+    
+
+For 2025 and beyond, health expenditures per capita are projected using
+the primary model. The primary model is an autoregressive model of
+expenditure growth that includes projections of PDI and, new for the
+spring 2025 baseline, medical prices (PCEMED).[^7] Thus, the model tends
+to revert from expenditure growth in the first year of the window to a
+long-term equilibrium while tracking projected changes in income and
+medical prices. Although the historical NHEA data extend into the 1980s,
+CBO excludes data prior to 1999 when estimating the model, as expenditure
+growth in the 1990s was driven by the rise of and subsequent backlash
+against health maintenance organizations (HMOs). CBO believes that the more
+distant historical period is less applicable to projecting premium
+growth over the next decade.
+
+[^7]: For convenience, the model includes the PCEMED index as an
+    explanatory variable with a fixed coefficient of one. That approach
+    is equivalent to estimating the model and generating predictions in
+    real terms then multiplying the predictions by PCEMED to convert
+    them to nominal terms.
+
+To further refine its estimates, CBO conducted a series of stakeholder
+interviews and reviewed data from other sources including the Federal
+Employees Health Benefits program. Stakeholders were selected to
+represent the views of the insurance industry, actuaries, and employers
+in their role as purchasers of health benefits. Drawing from those
+sources, CBO applies an adjustment factor to the current-year estimate
+(growth from 2023 to 2024), and the first year of the projection (growth
+from 2024 to 2025).
+
+The following table summarizes updates to the PGM methodology applied to
+the spring 2025 baseline:
+
+|  |  |  |
+|----|----|----|
+| **Factor** | Spring 2024 | Spring 2025 |
+| Near-term projection | 2.0% growth from 2021 to 2022 and 6.7% growth from 2022 to 2023, based on review of NHEA data and survey sources | Preliminary estimate of growth from 2023 to 2024 based on current-year model; growth from 2023 to 2024 increased by 2 percentage points and growth from 2024 to 2025 increased by 2 percentage points on the basis of stakeholder interviews and other data |
+| PGM: Estimation period | 2003-2022 (*N* = 20) | 1999-2023 (*N* = 25) |
+| PGM: Dependent variable | Percentage change in nominal private health expenditures per capita | Log difference in health expenditures per capita deflated by PCEMED |
+| PGM: Lagged dependent variable terms | Three | One |
+| PGM: Income variable | Three-year log difference in nominal PDI per capita | Six-year log difference in PDI per capita deflated by PCE |
+| PGM: Estimator | Prais-Winsten | Ordinary least squares |
+
+## Changes to the Projection
+
+To facilitate the comparison of the spring 2024 and spring 2025 projections,
+changes in the estimates are decomposed into a series of steps:
+
+1.  **Updating the Historical Data:** Changes resulting from updating the
+    data on expenditures per capita (and our adjustments to them) and
+    the demographic composition of the privately insured population. The
+    macroeconomic forecast and the model specification and coefficients
+    are held fixed.
+2.  **Updating the Macroeconomic Forecast:** Changes resulting from updating
+    the macroeconomic forecast. The model specification and coefficients
+    are held fixed.
+3.  **Updating the Coefficients of the Previous Model Specification:**
+    Changes resulting from updating the coefficient estimates using the
+    model specification from the previous baseline. The model
+    specification is held fixed.
+4.  **Updating the Model Specification:** Changes resulting from updating
+    the model specification.
+5.  **Adjusting the Near-Term Projections:** Adjustments are made to the
+    current-year estimate and the estimate for the first year of the
+    projection. These adjustments reflect stakeholder input and data not
+    otherwise formally incorporated in the projection.
+
+### Step 1: Updating the Historical Data
+
+```{r calc_increase_step1, warning=FALSE, message=FALSE, results='hide'}
+# Calculate the increase in private health expenditures per capita in 2034 
+# between prem_demo_b2024 and prem_demo_b2025
+increase <- pgm_output |>
+    select(series, cy2034) |>
+    filter(series %in% c("prem_demo_b2024", "prem_demo_b2024_step1")) |>
+    spread(series, cy2034) |>
+    mutate(
+        pct_increase = (prem_demo_b2024_step1 - prem_demo_b2024) / prem_demo_b2024,
+        dollar_increase = prem_demo_b2024_step1 - prem_demo_b2024
+      )
+
+pct_increase_step1 <- increase |>
+    pull(pct_increase) |>
+    # Format as a percentage
+    scales::percent(accuracy = 0.1)
+
+dollar_increase_step1 <- scales::label_dollar(accuracy=1)(increase |> pull(dollar_increase))
+```
+
+As shown in the chart below, CBO's projection of expenditures per capita
+in 2034 has increased by `r dollar_increase_step1`
+(`r pct_increase_step1`) since last year because of changes in the historical
+data. In the historical data, values for expenditure growth increased in
+2020, 2022, and 2023. Those changes yield higher premium growth in 2024
+but a similar path thereafter. The difference in 2020 is due to the
+aforementioned change in CBO's method for adjusting expenditure growth
+during the first year of the pandemic, when expenditures fell sharply
+relative to premiums. The difference in 2022 and 2023 reflects (1) an
+upward revision to the NHEA data for 2022 and (2) a new data point in
+2023. Both the revised 2022 and new 2023 premium growth rates are higher
+than the rates estimated from survey data in those years.
+
+```{r step1, warning=FALSE, message=FALSE, results='hide'}
+
+# Step 1: Updating Historical NHEA and CPS Data
+level_series_step1 <- c(level_prev, level_step1)  
+pchange_series_step1 <- c(pchange_prev, pchange_step1)  
+combined_plot_step1 <- forecast_plots(level_series_step1, pchange_series_step1, 
+                                      "Step 1: Updating Historical NHEA and CPS Data")
+combined_plot_step1
+```
+
+### Step 2: Updating the Macroeconomic Forecast
+
+The updates to CBO's PDI forecast had a negligible effect on the
+projections of health expenditure growth. This step includes the
+adjustments to the PDI forecast in the early 2020s to account for
+drawn-out spending of stimulus payments received in 2021 and 2022 and
+excess capital gains in 2021. The effect of updating the PDI forecast is
+minor because the estimated coefficient on the three-year growth rate of
+PDI per capita in the spring 2024 baseline model was very small: A 10
+percentage-point increase in the three-year PDI per capita growth rate
+yields only a 0.2 percentage-point increase in the health expenditures
+per capita growth rate. The change in PDI was negligible, as the
+previous specification placed less emphasis on it.
+
+```{r step2, warning=FALSE, message=FALSE, results='hide'}
+
+# Step 2: Updating the Macroeconomic Forecast
+level_series_step2 <- c(level_step1, level_step2)
+pchange_series_step2 <- c(pchange_step1, pchange_step2)
+combined_plot_step2 <- forecast_plots(level_series_step2, pchange_series_step2,
+                                      "Step 2: Updating the Macroeconomic Forecast")
+combined_plot_step2
+```
+
+### Step 3: Updating the Coefficients of the Previous Model Specification
+
+In Step 3, CBO reestimates the spring 2024 specification using the updated
+input data and projects expenditure growth using the updated coefficient
+estimates. In the updated estimates, the effect of PDI roughly doubled,
+and the magnitude of the coefficients on the first and second
+autoregressive terms (which are positive and negative, respectively)
+increased. Those changes yield a projected peak in expenditure growth in
+2024, greater oscillation around the equilibrium thereafter, and,
+overall, higher expenditures in 2033.
+
+```{r step3, warning=FALSE, message=FALSE, results='hide'}
+
+# Step 3: Updating Coefficients for the Previous Model Specification
+level_series_step3 <- c(level_step2, level_step3)
+pchange_series_step3 <- c(pchange_step2, pchange_step3)
+combined_plot_step3 <- forecast_plots(level_series_step3, pchange_series_step3,
+                                      "Step 3: Updating Coefficients for\nthe Previous Model Specification")
+combined_plot_step3
+
+```
+
+### Step 4: Updating the Model Specification
+
+The next step in updating the projection is estimating the new model
+specification. One update is to define a formal regression model (the
+"current-year" model) for growth in the first year of the projection (from 2023 to 2024). That model is a simple regression of expenditure
+growth on survey estimates of premium growth from BLS and KFF's EHBS.
+The PGM specification for 2025 was also updated in several key ways.
+
+First, the projection is now based on real health expenditures per
+capita, rather than nominal health expenditures per capita, and the projections of real health
+expenditures are combined with a projected price index (PCEMED) to yield
+projected nominal values. Second, the regression now includes real PDI
+as a predictor, rather than nominal PDI. Those two changes reflect a
+conceptual framework in which growth in real income drives growth in
+real health expenditures, and price growth is modeled separately.
+
+Third, growth in PDI is now measured over six rather than three years.
+That allows for longer delays in the process by which real income leads
+to changes in real health expenditures. CBO uses a six-year lag because
+a literature review by the agency identified income as a primary
+determinant of health spending growth in the medium term and model
+validation statistics indicated that long-term growth rates are a better
+predictor of health spending than short-term growth rates or distributed
+lag models.
+
+Fourth, the PGM now uses one rather than three autoregressive terms.
+During model validation, CBO found that one lag was sufficient to
+eliminate autocorrelation in the model residuals.
+
+The change in model specification yields a sharply lower projection for
+2025 and a smoother projection for the remainder of the window that ends
+at a slightly lower rate of growth. According to CBO's conversations
+with stakeholders, the previous specification's forecast for 2025 is
+more plausible than the new specification's; however, it also yields an
+implausible oscillating pattern in the remainder of the forecast window.
+By using a specification with a single lagged term while imposing a
+positive adjustment to the forecast in 2024 and 2025, the agency
+achieves a similarly plausible projection for 2025 with a more plausible
+path thereafter. Essentially, CBO's updated specification models growth
+in 2024 and 2025 as the product of temporary shocks to omitted variables
+in those years rather than as the product of a more complicated
+autoregressive process.
+
+```{r step4, warning=FALSE, message=FALSE, results='hide'}
+
+# Step 4: Updating the Model Specification
+level_series_step4 <- c(level_step3, level_step4)
+pchange_series_step4 <- c(pchange_step3, pchange_step4)
+combined_plot_step4 <- forecast_plots(level_series_step4, pchange_series_step4,
+                                     "Step 4: Updating the Model Specification")
+combined_plot_step4
+
+```
+
+### Step 5: Adjusting the Near-Term Projections
+
+The final projections incorporate a 2 percentage-point boost in both 2024 and
+2025. Those boosts were incorporated to
+capture the findings from stakeholder interviews and other data
+indicating rapid growth in expenditures over the near term. This initial
+jump is expected to slow as a result of stabilization of take-up of high-cost
+medication among enrollees in private health insurance.
+
+```{r step5, warning=FALSE, message=FALSE, results='hide'}
+level_series_step5 <- c(level_step4, level_current)
+pchange_series_step5 <- c(pchange_step4, pchange_current)
+combined_plot_step5 <- forecast_plots(level_series_step5, pchange_series_step5,
+                                     "Step 4: Adjusting the Near-Term Projections")
+combined_plot_step5
+```
+
+### Additional Projections: Health Care Expenditures Per Capita Without Demographic Adjustment
+
+CBO also produces projections of health expenditures per capita that
+incorporate changes in the age and sex composition of the privately
+insured population. The agency generates those predictions by estimating
+the same current-year and primary models using data that have not been
+adjusted for demographics. The difference between the adjusted and
+unadjusted projections (in log differences) represents the implied
+change in health expenditures per capita due to demographic changes. As
+growth in the unadjusted projections exceeds growth in the adjusted
+projections, CBO is implicitly forecasting that demographic changes will
+contribute positively to growth in health expenditures per capita over
+the next 10 years. That expected trend is consistent with the continued
+aging of the U.S. population.
+
+```{r jct, warning=FALSE, message=FALSE, results='hide'}
+
+level_series_jct <- c(level_jct_prev, level_jct_current)
+pchange_series_jct <- c(pchange_jct_prev, pchange_jct_current)
+combined_plot_jct <- forecast_plots(level_series_jct, pchange_series_jct,
+                                      "Previous and Current Projections\nWithout Demographic Adjustments")
+combined_plot_jct
+```
+
+\section*{Glossary}
+\label{sec:glossary}
+
+## Glossary
+
+-   **Health expenditures per capita**
+
+The premium growth model uses data on private enrollment and
+expenditures from Table 21 of the National Health Expenditure Accounts
+to create private per capita premiums. National health expenditures
+equal health consumption expenditures plus the sum of medical-sector
+purchases of structures and equipment and expenditures for noncommercial
+medical research (investment).
+
+Private Per Capita Premiums = Total Private Health Insurance
+Expenditures / Total Private Health Insurance Enrollment
+
+Sources: [Centers for Medicare & Medicaid Services, "Historical"](https://www.cms.gov/data-research/statistics-trends-and-reports/national-health-expenditure-data/historical)
+(accessed January, 2025), and [Bureau of
+Economic Analysis, NIPA Handbook: Concepts and Methods of the U.S.
+National Income and Product Accounts, Chapter 5](https://www.bea.gov/resources/methodologies/nipa-handbook) (December 2024),
+.
+
+-   **Personal consumption expenditures price index for medical spending
+    (PCEMED)**
+
+The premium growth model uses PCEMED to measure medical prices and
+deflate nominal private health insurance expenditures per capita. Historical values of PCEMED are taken from the Bureau of
+Economic Analysis's (BEA's) National Income and Products Accounts
+(NIPAs), and projections are done by CBO.
+
+PCEMED has three subcomponents:
+
+-   PCE: Therapeutic Appliances & Equipment Price Index , also known as PCDMED, which comprises 2 percent of PCEMED
+
+-   PCE: Pharmaceutical & Other Medical Products Price Index, also known as PCNMED, which comprises 17 percent of PCEMED
+
+-   PCE: Health Care Services, also known as PCSMED, which comprises 81 percent of PCMED
+
+CBO's projections of PCDMED and PCNMED are based on simple
+autoregressive moving average models. The agency's projections of
+PCSMED, which makes up the bulk of the PCEMED index, involve an
+iterative process within CBO between MAD and the Budget Analysis Division.
+
+Key steps for projecting PCSMED include:
+
+1.  Forecasting producer price indexes (PPIs) for inpatient care,
+    outpatient care, and physician care
+
+2.  Using those PPIs to forecast PCE price indexes for hospital care and
+    physician care
+
+3.  Aggregating the resulting PCE indexes along with the employment cost
+    index (ECI) to forecast the overall PCE for medical services
+
+Equation for PCSMED (as of spring 2024), where the Greek letter pi represents growth in a price index, beta represents an estimated coefficient, and epsilon is an error term:
+
+$$ \pi_t^{\text{PCSMED}} = \beta_1\pi_{t-1}^{\text{PCSMED}} + \beta_2\pi_t^{\text{PCE for hospital care}} + \beta_3\pi_t^{\text{PCE for physician care}} + \beta_4\text{ECI}_t + \epsilon_t$$
+
+The following table describes some of the key differences between PCEMED and the Consumer Price Index: Medical care (CPI-M).
+
+| Factor | PCEMED | CPI-M |
+|----|----|----|
+| Scope | Includes direct payments made by consumers and third-party payments made on behalf of consumers | Only includes out-of-pocket expenditures made by consumers |
+| Construction | Fisher price index | Laspeyres index |
+| Data sourcing | Sector-specific PPIs and sector-specific CPIs | Consumer surveys |
+| Usage as medical care deflator | Adjusting for purchasing power changes on personal consumption expenditures | Adjusting for purchasing power changes in out-of-pocket expenditures |
+
+-   **Personal consumption expenditures price index for consumer goods
+    (PCE)**
+
+The premium growth model uses PCE to deflate growth in personal
+disposable income. This series is taken and processed from the Bureau of
+Economic Analysis's National Income and Products Accounts (NIPA) data.
+In the NIPAs, final consumption expenditures by households or nonprofit
+institutions serving households represent the portion of PCE for
+services provided to households without explicit charge, like the value
+of nonprofit college education exceeding tuition and fees. It equals
+their gross output, calculated as current operating expenses (excluding
+capital investments) minus sales to households and other sectors and the
+value of investment goods.
+
+Source: Congressional Budget Office, [*Historical Data and Economic Projections*](https://www.cbo.gov/data/budget-economic-data#11)
+(accessed January, 2025).
+
+-   **Personal Disposable Income (PDI)**
+
+The PGM uses real PDI, meaning nominal PDI divided by PCE, as an
+explanatory variable for real premium growth. PDI is the income that is
+left after people pay their taxes, and so is also known as after-tax
+income.
+
+Source: Congressional Budget Office, [*Historical Data and Economic Projections*](https://www.cbo.gov/data/budget-economic-data#11)
+(accessed January, 2025); and Bureau of Economic Analysis,
+[*Income & Saving*](https://www.bea.gov/resources/learning-center/what-to-know-income-saving) (accessed January, 2025).
+
+-   **Yamamoto index**
+
+Dale H. Yamamoto measured health care spending among a sample of enrollees
+in commercial health insurance, by single year of age and sex. Those
+spending measures are combined with enrollment data from the Current
+Population Survey and are used to estimate the role of demographic
+changes in the historical trends in private health expenditures per
+capita.
+
+Source: Dale H. Yamamoto. [*Health Care Costs---From Birth to Death*](https://www.soa.org/resources/research-reports/2013/research-health-care-birth-death/) (2013).
