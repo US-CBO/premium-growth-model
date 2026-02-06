@@ -49,14 +49,14 @@ The model produces two comma-separated value (`*.csv`) files that contain numeri
 1. Navigate to `premium-growth-model.Rproj` in the repository and double-click. This should open the project in RStudio.
 2. In the console, type `renv::restore()`. This will begin dowloading and installing packages necessary to run the program. This may take some time.
 3. Once that has finished, execute a `renv::status()` command to confirm that the project is in a consistent state.
-4. Open the `/docs/report/baseline_2025/report.qmd` file.
+4. Open the `/docs/report/baseline_2026/report.qmd` file.
 5. Navigate to the `render` button on the top left of the project (to the left of the Settings icon) and click it once. This will render the report.
 6. Users should need to perform actions 1, 2, and 3 only once, although it is good practice to always perform the `renv::status()` action. Thereafter, users should only need to click the `render` button. 
 
 
 ## Acknowledgments
 
-The PGM was developed and maintained by CBO analysts **Ben Hopkins**, **Julianna Mack**, and **Robert Lindsay** (formerly of CBO). **Caroline Hanson** and **Eamon Molloy** contributed to the word review of the model, and **Christine Browne** and **Lora Engdahl** prepared materials for publication. **Kevin Perese**, **Claire Hou** and **Rajan Topiwala** reviewed the code for this project. **Christine Ostrowski** assisted in CBO's data analysis. **Katherine Feinerman** (formerly of CBO) maintained the previous PGM. **Alexandra Minicozzi** and **Chapin White** supervised the most recent model development.
+The PGM was developed and maintained by CBO analysts **Ben Hopkins** and **Rajan Topiwala**. **Kevin Perese** and **Romain Parsad**  reviewed the code for this project. **Christine Ostrowski** assisted in CBO's data analysis. **Julianna Mack**, **Robert Lindsay**, and **Katherine Feinerman** (all formerly of CBO) maintained the previous PGM. **Alexandra Minicozzi** and **Chapin White** supervised the most recent model development and reviewed the forecast.
 
 ## Contact
 
