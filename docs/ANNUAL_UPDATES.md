@@ -56,9 +56,14 @@ Budget Office from the drop-down list of institutions. That will ensure
 that your account is associated with CBO and is covered by the agency's
 specialized license terms.
 
-In data sample selection, select ALL SAMPLES under the ASEC tab and add
-the following variables if they are not preselected: age, sex, hcovpriv,
-phinsur, hinswt, and asecwt.
+Once logged in, click on "Select Data" in the menu bar. Next click the orange "SELECT SAMPLES" button. 
+
+In data sample selection, check "Select all samples" under the ASEC tab and then click the orange
+"SUBMIT SAMPLE SELECTIONS" button. Now the samples have been selected we will select the variables: 
+athe following variables using the search button if they are not preselected: age, sex, hcovpriv,
+phinsur, hinswt, and asecwt. Use the "+" sign to add these variables to the cart. After adding, click on 
+"VIEW CART" in the top right-hand corner of the website. Check to make sure all variables needed are in the cart.
+Then click on the orange "CREATE DATA EXTRACT" button. 
 
 Note: Use hcovpriv for years prior to 2014 and phinsur starting in 2014, as
 hcovpriv (the variable used to identify whether an individual was
@@ -73,14 +78,14 @@ information, asecwt poses no comparability problems for 2014. CBO also
 found that the new weights (changed from wtsupp to asecwt for
 CPS 2017) did not substantially alter the premium growth projections.
 
-Download the IPUMS data (it will be zipped) and the STATA command file
+Once, extracted, download the IPUMS data (it will be zipped) and the STATA command file
 from IPUMS. Save in the new vintage folder in the S drive you created
-for the raw CPS data and unzip the .dat.gz file. That will create the .dat
+for the raw CPS data and unzip the .dat.gz file using 7zip. That will create the .dat
 file used in the program.
 
 Create a copy of the most recent `create_age_sex_index.do` and paste it
-into a new folder for the new vintage of the CPS. Update the code to use
-the new CPS data, and write the output to the new prepped data folder.
+into a new folder for the new vintage of the CPS. Update the cps parameters in the parameters.do file to use
+the new CPS data, and run main.do with prep_cps_data = 1 to write the output to the new prepped data folder. Check to make sure the new CPS data has been created in the correct vintage folder.
 
 #### National Health Expenditure Accounts (NHEA)
 
@@ -151,8 +156,8 @@ data](https://data.bls.gov/timeseries/PCU524114524114101) from 2003 on
 without annual averages and save in the raw data folder.
 
 Create a copy of the most recent `process_BLS.do` and paste it into a
-new folder for the new vintage of the BLS data. Update the code to use
-the new BLS data, and write the output to the new prepped data folder.
+new folder for the new vintage of the BLS data. Update the set_parameters.do to use
+the new BLS data, and move the old BLS filename to the bls_filename_prev parameter. Run main.do with the prep_bls_data = 1 and ensure the new output data is created in the correct vintage folder. 
 
 #### Merge
 

@@ -1,0 +1,13 @@
+=== PREMIUM GROWTH MODEL FORECAST METADATA ===
+Forecast Information:
+  Baseline Vintage: 2026
+  Generation Date/Time: 2025-11-17T153423
+
+System Information:
+  STATA Version: 14.2 (IC, 64-bit)
+Version Control:
+  Git Commit Hash: 7c31b8165ca8053b51a076352776a8b8b1056912
+  Uncommitted Changes: No
+
+Output File Information:
+  SHA1 Checksum: C6A6DBE1283BF550F96158EDCF9D7C066FDAAA3F

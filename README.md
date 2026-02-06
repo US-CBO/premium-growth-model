@@ -4,7 +4,7 @@ The Congressional Budget Office uses its premium growth model (PGM) to generate 
 
 This file describes how to clone the repository containing the PGM, run the PGM, and replicate CBO's results. This file is intended to be used along with other sources of documentation:
 
-- The purpose and technical specifications of the PGM are described in detail in a [report](https://us-cbo.github.io/premium-growth-model/report/baseline_2025/report.html).
+- The purpose and technical specifications of the PGM are described in detail in a [report](https://us-cbo.github.io/premium-growth-model/report/baseline_2026/report.html).
 - The [ANNUAL_UPDATES.md](/docs/ANNUAL_UPDATES.md) file describes how to update and process raw source data as part of CBO's annual baseline update.
 - Two visual flowcharts, one [high-level](Flowchart_highlevel.png) and one [detailed](Flowchart_detailed.png), illustrate the processing of data.
 - The [Abbreviations.md](/docs/Abbreviations.md) file defines the abbreviations used in the model and report. 

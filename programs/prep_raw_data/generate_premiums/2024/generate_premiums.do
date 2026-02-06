@@ -21,8 +21,8 @@
 ***************************************************************************/
 
 clear
-*RT: Added phi_vintage_prev for the winter 2026 baseline
-args phi_vintage_prev nhe_vintage cps_vintage
+*RT: Add phi_vintage for the Winter 2024 baseline
+args phi_vintage nhe_vintage cps_vintage
 
 * Define a temporary dataset to save the data
 tempfile premiums
@@ -74,37 +74,38 @@ replace adj_total_phi_exp_`nhe_vintage' = ///
 	adj_total_phi_exp_`nhe_vintage' - hit_premiums
 
 /* ~~~~~ Generate and adjust premiums ~~~~~ */
+*RT: Here we need to use phi_vintage parameter or in the merge we wont see the differences from last baseline
 
 * Generate premiums and the a version that holds the age / sex composition of the population constant
 * At this point, drop the private health insurance (PHI) prefix
-gen double prem_`nhe_vintage' = 1000 * adj_total_phi_exp_`nhe_vintage' / adj_total_phi_enrollment_`nhe_vintage'
-gen double prem_demo_`nhe_vintage' = prem_`nhe_vintage' / real_yamamoto
+gen double prem_`phi_vintage' = 1000 * adj_total_phi_exp_`nhe_vintage' / adj_total_phi_enrollment_`nhe_vintage'
+gen double prem_demo_`phi_vintage' = prem_`phi_vintage' / real_yamamoto
 
 * Generate premium growth
-gen pchange_prem_`nhe_vintage' = prem_`nhe_vintage' / L.prem_`nhe_vintage' - 1
-gen pchange_prem_demo_`nhe_vintage' = prem_demo_`nhe_vintage' / L.prem_demo_`nhe_vintage' - 1
+gen pchange_prem_`phi_vintage' = prem_`phi_vintage' / L.prem_`phi_vintage' - 1
+gen pchange_prem_demo_`phi_vintage' = prem_demo_`phi_vintage' / L.prem_demo_`phi_vintage' - 1
 
 * Adjust premiums: ACA implementation
 * 2013's premium growth was a little slower than usual because of ACA effects
 * Research suggests that it should be adjusted upward 0.5% to negate this effect
 * 2014's premium growth was a little higher than usual because of ACA effects
 * Adjust downward 0.5% to negate this effect
-replace pchange_prem_`nhe_vintage' = pchange_prem_`nhe_vintage' + .005 if year == 2013
-replace pchange_prem_`nhe_vintage' = pchange_prem_`nhe_vintage' - .005 if year == 2014
-replace prem_`nhe_vintage' = L.prem_`nhe_vintage' * (1+pchange_prem_`nhe_vintage') if _n > 1
+replace pchange_prem_`phi_vintage' = pchange_prem_`phi_vintage' + .005 if year == 2013
+replace pchange_prem_`phi_vintage' = pchange_prem_`phi_vintage' - .005 if year == 2014
+replace prem_`phi_vintage' = L.prem_`phi_vintage' * (1+pchange_prem_`phi_vintage') if _n > 1
 
-replace pchange_prem_demo_`nhe_vintage' = pchange_prem_demo_`nhe_vintage' + .005 if year == 2013
-replace pchange_prem_demo_`nhe_vintage' = pchange_prem_demo_`nhe_vintage' - .005 if year == 2014
-replace prem_demo_`nhe_vintage' = L.prem_demo_`nhe_vintage' * (1+pchange_prem_demo_`nhe_vintage') if _n > 1
+replace pchange_prem_demo_`phi_vintage' = pchange_prem_demo_`phi_vintage' + .005 if year == 2013
+replace pchange_prem_demo_`phi_vintage' = pchange_prem_demo_`phi_vintage' - .005 if year == 2014
+replace prem_demo_`phi_vintage' = L.prem_demo_`phi_vintage' * (1+pchange_prem_demo_`phi_vintage') if _n > 1
 
 * Adjust premiums: COVID era
-sum prem_`nhe_vintage' if inlist(year, 2019, 2021)
-replace prem_`nhe_vintage' = r(mean) if year == 2020
-replace pchange_prem_`nhe_vintage' = prem_`nhe_vintage' / L.prem_`nhe_vintage' - 1
+sum prem_`phi_vintage' if inlist(year, 2019, 2021)
+replace prem_`phi_vintage' = r(mean) if year == 2020
+replace pchange_prem_`phi_vintage' = prem_`phi_vintage' / L.prem_`phi_vintage' - 1
 
-sum prem_demo_`nhe_vintage' if inlist(year, 2019, 2021)
-replace prem_demo_`nhe_vintage' = r(mean) if year == 2020
-replace pchange_prem_demo_`nhe_vintage' = prem_demo_`nhe_vintage' / L.prem_demo_`nhe_vintage' - 1
+sum prem_demo_`phi_vintage' if inlist(year, 2019, 2021)
+replace prem_demo_`phi_vintage' = r(mean) if year == 2020
+replace pchange_prem_demo_`phi_vintage' = prem_demo_`phi_vintage' / L.prem_demo_`phi_vintage' - 1
 
 * Save the updated source data.
 keep year prem_* pchange_*
@@ -112,5 +113,5 @@ save `premiums', replace
 
 * Save the final merged dataset.
 *export delimited using "$repo_path\prepped_data\phi_premiums\\`nhe_vintage'\phi_premiums", replace
-*RT: For the Winter 2026 baseline we use the paramter phi_vintage_prev since NHEA data is not getting updated
-export delimited using "$repo_path\prepped_data\phi_premiums\\`phi_vintage_prev'\phi_premiums", replace
+*RT: For the 2026 Winter Baseline we change this to phi_vintage because NHEA data has not been updated
+export delimited using "$repo_path\prepped_data\phi_premiums\\`phi_vintage'\phi_premiums", replace

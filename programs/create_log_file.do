@@ -13,6 +13,6 @@ local mm = substr(c(current_time), 4, 2)
 local ss = substr(c(current_time), 7, 2)
 
 * Combine date and time components
-local datetime "`iso_date'-T`hh'`mm'`ss'"
+global datetime "`iso_date'T`hh'`mm'`ss'"
 
-log using "$repo_path/logs/main_`datetime'.log", replace
+log using "$repo_path/logs/main_${datetime}.log", replace

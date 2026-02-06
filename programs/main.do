@@ -53,12 +53,12 @@ do set_parameters.do
 
 * Model execution parameters: 1 will run; 0 will not
 * To run the prep code, the user has to have downloaded the raw data to the appropriate directories
-local prep_cps_data = 0
-local prep_cps_data_prev = 0
-local prep_nhe_data = 0
-local prep_mad_data = 0 // These scripts are not executable outside of CBO
-local prep_bls_data = 0
-local prep_kff_data = 0
+local prep_cps_data = 1
+local prep_cps_data_prev = 1
+local prep_nhe_data = 1
+local prep_mad_data = 1 // These scripts are not executable outside of CBO
+local prep_bls_data = 1
+local prep_kff_data = 1
 local generate_premiums = 1
 local merge_data = 1
 local run_current_year_forecast = 1
@@ -98,7 +98,7 @@ if `prep_mad_data' == 1 {
 
 * BLS Data
 if `prep_bls_data' == 1 {
-    do prep_raw_data/bls/$bls_vintage_prev/process_BLS.do $bls_vintage_prev
+    do prep_raw_data/bls/$bls_vintage_prev/process_BLS.do $bls_vintage_prev $bls_filename_prev
     do prep_raw_data/bls/$bls_vintage/process_BLS.do $bls_vintage $bls_filename
 }
 
@@ -111,16 +111,17 @@ if `prep_kff_data' == 1 {
 *** Generate the premium variable and compile the data
 
 * Generate premiums
+* RT: The 2026 Winter baseline does not update NHE Vintage
 if `generate_premiums' == 1 {
-    do prep_raw_data/generate_premiums/$nhe_vintage/generate_premiums.do $nhe_vintage $cps_vintage
-    do prep_raw_data/generate_premiums/$nhe_vintage_prev/generate_premiums.do $nhe_vintage_prev $mad_vintage_prev $cps_vintage_prev
+    do prep_raw_data/generate_premiums/$phi_vintage/generate_premiums.do $phi_vintage $nhe_vintage $cps_vintage 
+    do prep_raw_data/generate_premiums/$phi_vintage_prev/generate_premiums.do $phi_vintage_prev $nhe_vintage $cps_vintage_prev
 }
 
 * Merge the data
 if `merge_data' == 1 {
     do prep_raw_data/merge/$baseline_vintage/merge.do ///
         $baseline_vintage ///
-        $nhe_vintage $nhe_vintage_prev /// 
+        $phi_vintage $phi_vintage_prev /// 
         $mad_vintage $mad_vintage_prev ///
         $kff_vintage $kff_vintage_prev ///
         $bls_vintage $bls_vintage_prev ///
@@ -135,7 +136,7 @@ if `run_current_year_forecast' == 1 {
         $baseline_vintage ///
         $kff_vintage $kff_vintage_prev ///
         $bls_vintage $bls_vintage_prev ///
-        $nhe_vintage $nhe_vintage_prev ///
+        $phi_vintage $phi_vintage_prev ///
         $current_yr $current_yr_prev
 }
 
@@ -143,10 +144,12 @@ if `run_current_year_forecast' == 1 {
 if `run_forecast' == 1 {
     do run_model/baseline_$baseline_vintage/pgm.do  ///
         $baseline_vintage $baseline_vintage_prev ///
-        $nhe_vintage $nhe_vintage_prev ///
+        $phi_vintage $phi_vintage_prev ///
         $mad_vintage $mad_vintage_prev ///
         $kff_vintage $kff_vintage_prev ///
         $bls_vintage $bls_vintage_prev
+
+    do generate_metadata.do $baseline_vintage
 }
 
 log close
